@@ -79,7 +79,7 @@ CanvasRenderingContext2D.prototype.setAllImageData = function(imageData)  {
   return this.putImageData(imageData,0,0)
 }
 
-function blankCanvas(width=512, height=width, filled=true) {
+function blankCanvas(width=512, height=768, filled=true) {
   const canvas = document.createElement("canvas");
   canvas.width=width;
   canvas.height=height;
