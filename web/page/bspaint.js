@@ -208,7 +208,7 @@ class Layer {
 function updateMirrorGridButtonImage() {
   const columns = $(".grid_mirrors #repeat_x").val();
   const rows = $(".grid_mirrors #repeat_y").val();
-  const image=gridImage(rows,columns,48);
+  const image=gridImage(rows,columns,96);
   $("#mirror_grid").css('background-image',`url(${image.toDataURL()})`);
 }
 
@@ -1061,7 +1061,7 @@ function brushDiameterControl(id="diameter") {
   element.className="diameter_control"
   element.id=id;
   const ctx = element.getContext("2d");
-  const max_diameter = 300;
+  const max_diameter = 96;
   element.width=192;
   element.height=max_diameter;
   //radius divider removes one radius for the half circle at the end of the control
