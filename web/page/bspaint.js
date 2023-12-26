@@ -1061,7 +1061,7 @@ function brushDiameterControl(id="diameter") {
   element.className="diameter_control"
   element.id=id;
   const ctx = element.getContext("2d");
-  const max_diameter = 48;
+  const max_diameter = 300;
   element.width=192;
   element.height=max_diameter;
   //radius divider removes one radius for the half circle at the end of the control
