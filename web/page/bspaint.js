@@ -24,19 +24,31 @@ var tip = {
 var hotkeys = {};
 
 var initialPalette = [
-  "#000000","#ffffff",
+  "#000000",
   "#404040","#808080",
   "#a0a0a0","#b8b8b8",
   "#d0d0d0","#e0e0e0",
+  "#ffffff",
+
+  "#a00000","#ff0000", "#ff7070", "#ffb0b0",
+  "#a06000","#ff8000", "#ffa068", "#ffd0b0",
+  "#a0a000","#ffff00", "#ffff70", "#ffffc0",
+
+  "#509000","#90f000", "#c0ff68", "#e0ffb8",
+
+  "#008000","#00ff00", "#70ff60", "#c0ffb0",
+  "#007050","#00f0a0", "#70ffa0", "#c0ffe0",
+  "#006060","#00e0e0", "#70ffff", "#c0ffff",
+  "#004080","#0080ff", "#70a0ff", "#c0e0ff",
+  "#000090","#0000ff", "#7070ff", "#c0c0ff",
+  "#500078","#7800c8", "#c870d8", "#d8b8ff",
+  "#a00060","#e00090", "#f070c0", "#ffb0ff",
+  "#881838","#b03060", "#d07890", "#f0b0c8",
+  "#703010","#904030", "#b08060", "#e0b0a0",
+  "#704040","#905050", "#b09070", "#e0c0b0",
   
-  "#ff0000","#ff8000",
-  "#ffff00","#008000",
-  "#00ff00","#00ff80",
-  "#0080ff","#50C0ff",
-  "#0000ff","#8080ff",
-  "#a00060","#ff00ff",
-  "#ffa0a0","#a06040",
-  "#b07050","#904030"];
+  "#00ff80","#0080ff","#50C0ff", "#2030cf",
+  "#8080ff","#4060a0","#ff00ff", "#ffa0a0",];
 
 
 var brushSizeControl = brushDiameterControl("tip_diameter");
@@ -102,15 +114,16 @@ class Layer {
   compositeOperation = "source-over";
   opacity = 1;
   _maskColor = lastUsedMaskColor;
-  constructor (pic,title, {width,height}, mask = false)  {
+  constructor (pic,title, {width,height}=pic, mask = false)  {
     this.parentPic = pic;
     this.canvas.width=width;
     this.canvas.height=height;
     this.mask = mask;
     this.title= title;
-    this.transform = [1,0 ,0,1, 0,0];
+    const offsetX=(pic.width-width)/2;
+    const offsetY=(pic.height-height)/2;0
+    this.transform = [1,0 ,0,1, offsetX,offsetY];
     this.rotationCenter= {x:width/2,y:height/2};
-    
     if (mask) {
       this.compositeOperation="source-over";
     }
@@ -350,7 +363,7 @@ function createDrawArea(canvas = blankCanvas(),initialTitle="Image") {
         if (!layer.visible) continue;        
         canvas.ctx.globalAlpha = layer.opacity;
         canvas.ctx.globalCompositeOperation=layer.compositeOperation;
-        if (this.isDrawing && layer===this.activeLayer) {
+        if (this.isDrawing && layer===this.activeLayer) {          
           canvas.ctx.drawImage(activeOperationCanvas,0,0);          
         } else {
           layer.draw(canvas.ctx);
@@ -443,11 +456,15 @@ function createDrawArea(canvas = blankCanvas(),initialTitle="Image") {
           ctx.restore();
           const unitRange=this.strokeCoordinates.map(({x,y})=>({x:x/canvas.width,y:y/canvas.height}));
 
+          ctx.save();
+          const opacity = $("#brush_opacity input[type=range]").val()/100;
+          ctx.globalAlpha=opacity;
           const strokes = this.strokeModifier([unitRange])          
           for (const unitStroke of strokes) {
             const stroke=unitStroke.map(({x,y})=>({x:x*canvas.width,y:y*canvas.height}));
             tip.tool.drawOperation(activeOperationCanvas.ctx,tip,stroke)
           }
+          ctx.restore();
           if (this.activeLayer.mask) {
             const ctx=activeOperationCanvas.ctx;
             ctx.save();
@@ -477,14 +494,28 @@ function createDrawArea(canvas = blankCanvas(),initialTitle="Image") {
       if (undoStack.length > undoDepth) undoStack.shift();
       layers.length = 0;  // Clear the existing array
       layers.push(...newList);  // Fill with new values
+      if (activePic===this) {
+        //do UI update if this is the active pic.
+        updateLayerList()
+      }
     },
 
-    addEmptyLayer(above = this.activeLayer) {
-      const newLayer = new Layer(this,"new layer", canvas);
+    addEmptyLayer(above = this.activeLayer,name="new layer") {
+      const newLayer = new Layer(this,name, canvas);
       this.insertLayerAbove(newLayer, above);
       this.activeLayer = newLayer;
       return newLayer;
     },
+    addLayerFromImage(image,above = this.activeLayer,name="new layer") {
+      const newLayer = new Layer(this,name, image);
+      newLayer.ctx.drawImage(image,0,0);
+      this.insertLayerAbove(newLayer, above);
+      this.activeLayer = newLayer;
+      this.updateVisualRepresentation(true);      
+      return newLayer;
+
+    },
+
     addDuplicateLayer(layer,above=layer) {
       if (!layer) {
           return this.addEmptyLayer();
@@ -803,7 +834,8 @@ function initPaint(){
   });
   
 
-
+  $("input.percentage").on("change",processPercentageInput);
+  $("input.percentage~input").on("input",processPercentageRange);
   window.test1=createDrawArea(undefined,"Image A");
   window.test2=createDrawArea(undefined,"Image B");
   test1.setPosition(30,60) ;
@@ -1306,9 +1338,11 @@ function updateLayerList() {
     window.dummyGlobal=result;
     const canvas = result.querySelector(".thumbnail");    
     const ctx=canvas.getContext("2d");
+    const scaleFactor = canvas.width/pic.width;
     ctx.save()
-    ctx.setTransform(...layer.transform);
-    ctx.drawImage(layer.canvas,0,0,canvas.width,canvas.height);  
+    ctx.scale(scaleFactor,scaleFactor)
+    ctx.transform(...layer.transform);
+    ctx.drawImage(layer.canvas,0,0);  
     ctx.restore();
     result.layer=layer;
 
@@ -1460,8 +1494,46 @@ function fillOrClear(from) {
   }   
 }
 
+document.addEventListener('paste', async (event) => {
+  const items = event.clipboardData.items;
 
+  for (const item of items) {
+      if (item.type.startsWith('image')) {
+          const imageFile = item.getAsFile();
+          const image = new Image();
+          image.src = URL.createObjectURL(imageFile);
 
+          image.onload = () => {
+             if (activePic) {
+              activePic.addLayerFromImage(image,activePic.activeLayer,imageFile.name);
+             }
+          };
+      }
+  }
+});
+
+function processPercentageInput(e) {
+  let element = e.currentTarget;
+  if (!element.hasOwnProperty("lastGoodValue")) element.lastGoodValue=100;
+  let range = element.parentElement.querySelector("input[type=range]");
+  let value = parseFloat(element.value);
+  if (Number.isNaN(value)) {
+    value=element.lastGoodValue;
+  }
+  value=Math.floor(value);
+  if (range) {
+    range.value=value;
+    value=range.value;
+  }
+  element.value=`${value}%`;
+}
+
+function processPercentageRange(e) {
+  const range = e.currentTarget;
+  console.log(range.value);
+  const input = range.parentNode.querySelector(".percentage")
+  input.value = ""+range.value+"%";
+}
 
 hotkeys["CTRL_Z"] = _=>{activePic?.undo()}
 hotkeys["CTRL_SHIFT_Z"] = _=>{activePic?.redo()}
